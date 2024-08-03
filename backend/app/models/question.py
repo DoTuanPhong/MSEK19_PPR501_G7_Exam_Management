@@ -12,8 +12,9 @@ class Question(Base):
     mix_choice = Column(Boolean, default = True)
 
     subject_id = Column(Integer, ForeignKey("subject.id"))
-    subject = relationship("Subject", back_populates("questions"))
-    choices = relationship("Choice", back_populates("question"))
+    subject = relationship("Subject", back_populates="questions")
+    choices = relationship("Choice", back_populates="question")
+    
     choices1 = relationship()
 
 
