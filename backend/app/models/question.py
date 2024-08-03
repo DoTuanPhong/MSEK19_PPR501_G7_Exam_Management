@@ -14,3 +14,15 @@ class Question(Base):
     subject_id = Column(Integer, ForeignKey("subject.id"))
     subject = relationship("Subject", back_populates("questions"))
     choices = relationship("Choice", back_populates("question"))
+    choices1 = relationship()
+
+
+class Choice(Base):
+    __tablename__ = "choices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    question_id = Column(Integer, ForeignKey("questions.id"))
+    text = Column(String, nullable=False)
+    is_correct = Column(Boolean, default=False)
+
+    question = relationship("Question", back_populates="choices")
