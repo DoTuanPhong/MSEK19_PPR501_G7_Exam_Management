@@ -107,12 +107,13 @@ class DocxProcessor:
     def get_or_create_subject(self, name, lecturer_name):
         subject = self.db.query(Subject).filter(Subject.name == name).first()
         if not subject:
+            raise ValueError(f"Subject {name} not found")
             lecturer = self.db.query(User).filter(User.username == lecturer_name).first()
             if not lecturer:
                 raise ValueError(f"Lecturer {lecturer_name} not found")
             subject = Subject(name=name, lecturer_id=lecturer.id)
-            self.db.add(subject)
-            self.db.commit()
+            # self.db.add(subject)
+            # self.db.commit()
         return subject
 
     def save_questions(self, subject, questions):
