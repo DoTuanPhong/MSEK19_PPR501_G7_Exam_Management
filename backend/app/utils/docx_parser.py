@@ -1,9 +1,8 @@
 import docx
 import base64
-from io import BytesIO
-from PIL import Image
 from datetime import datetime
-from docx.oxml.shared import qn
+from docx.oxml.shape import CT_Picture
+
 
 def parse_docx(file_path):
     doc = docx.Document(file_path)
@@ -35,7 +34,7 @@ def parse_docx(file_path):
     if len(info) != 4:
         warnings.append("Missing header information.")
 
-    expected_order = ['qn', 'a.', 'b.', 'c.', 'd.', 'answer', 'mark', 'unit', 'mix choices']
+    expected_order = ['qn', 'a.', 'b.', 'c.', 'd.', 'answer:', 'mark:', 'unit:', 'mix choices:']
     table_index = 0
 
     for table in doc.tables:
@@ -53,43 +52,44 @@ def parse_docx(file_path):
 
             if key.strip().lower().startswith('qn'):
                 question['text'] = value
-                # Handle image (MS Word 2016+)
+                # Handle image
                 for paragraph in row.cells[1].paragraphs:
                     for run in paragraph.runs:
-                        for element in run._element.findall('.//w:drawing', namespaces=run._element.nsmap):
-                            blip = element.find('.//a:blip', namespaces=run._element.nsmap)
-                            if blip is not None:
-                                rId = blip.get(qn('r:embed'))
+                        image_parts = []
+                        for element in run._element.iter():
+                            if isinstance(element, CT_Picture):
+                                rId = element.xpath('.//a:blip/@r:embed')[0]
                                 image_part = doc.part.related_parts[rId]
-                                image_bytes = image_part.blob
-                                image = Image.open(BytesIO(image_bytes))
-                                buffered = BytesIO()
-                                image.save(buffered, format="PNG")
-                                question['image'] = base64.b64encode(buffered.getvalue()).decode()
-            elif key.strip().lower() == 'a.':
+                                image_parts.append(image_part)
+                    
+                        if image_parts:
+                            image_bytes = image_parts[0].blob
+                            question['image'] = base64.b64encode(image_bytes).decode('utf-8')
+                            print('question image: ', question['image'])
                 question['choices'] = [value]
             elif key.strip().lower() in ['b.', 'c.', 'd.']:
                 if 'choices' in question:
                     question['choices'].append(value)
                 else:
                     warnings.append(f"Choice {key} found before 'a.' in table {table_index + 1}")
-            elif key.strip().lower() == 'answer':
+            elif key.strip().lower() == 'answer:':
                 question['correct_answer'] = value
-            elif key.strip().lower() == 'mark':
+            elif key.strip().lower() == 'mark:':
                 try:
                     question['mark'] = float(value)
                 except ValueError:
                     warnings.append(f"Invalid mark value in table {table_index + 1}")
-            elif key.strip().lower() == 'unit':
+            elif key.strip().lower() == 'unit:':
                 question['unit'] = value
-            elif key.strip().lower() == 'mix choices':
+            elif key.strip().lower() == 'mix choices:':
                 question['mix_choices'] = value.lower() == 'yes'
 
         # Ensure keys are in the expected order
         order = list(map(lambda x: x.strip().lower(), order))
         order[0] = order[0][:2]
+        
         if order != expected_order:
-            warnings.append(f"Keys are not in the expected order in table {table_index + 1}")
+            warnings.append(f"Keys are not in the expected order in table {table_index + 1}, {order}")
 
         if 'text' not in question:
             warnings.append(f"Question text is missing in table {table_index + 1}")
@@ -104,4 +104,5 @@ def parse_docx(file_path):
         table_index += 1
 
     return info, questions, warnings
+
 

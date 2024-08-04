@@ -8,18 +8,18 @@ def test_parse_docx_with_sample_file():
     file_path = r"F:\FSB\Python for Engineer\Week 2 - 1\Template.docx"
     
     # Call the parse_docx function with the sample file
-    metadata, questions, warnings = parse_docx(file_path)
+    info, questions, warnings = parse_docx(file_path)
     
     # Print results for debugging purposes
-    print("Metadata:", metadata)
+    print("info:", info)
     print("Questions:", questions)
     print("Warnings:", warnings)
     
-    # Check metadata (adjust the expected values based on the actual content of your template)
-    assert metadata['subject'] == 'ISC'
-    assert metadata['number_of_quiz'] == 30
-    assert metadata['lecturer'] == 'hungpd2'
-    assert metadata['date'] == datetime.strptime('22-08-1999', '%d-%m-%Y').date()  # Adjust date as per your template
+    # Check info (adjust the expected values based on the actual content of your template)
+    assert info['subject'] == 'ISC'
+    assert info['num_quiz'] == 30
+    assert info['lecturer'] == 'hungpd2'
+    assert info['date'] == datetime.strptime('22-08-1999', '%d-%m-%Y').date()  # Adjust date as per your template
     
     # Check questions
     assert len(questions) > 0  # Ensure there's at least one question
@@ -32,10 +32,9 @@ def test_parse_docx_with_sample_file():
     assert 'mark' in question
     assert 'unit' in question
     assert 'mix_choices' in question
+    assert 'image'  in question
+
+    print("Image: ", question['image'][0:5])
     
     # Check warnings
     assert len(warnings) == 0  # Ensure there are no warnings for a correctly formatted document
-
-# Run tests
-if __name__ == "__main__":
-    pytest.main()
