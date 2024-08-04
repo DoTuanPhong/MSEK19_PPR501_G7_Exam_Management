@@ -42,7 +42,7 @@ class DocxProcessor:
             if question:
                 questions.append(question)
 
-        subject = self.get_or_create_subject(subject_name, lecturer)
+        subject = self.get_subject(subject_name, lecturer)
         self.save_questions(subject, questions)
 
         return {
@@ -104,7 +104,7 @@ class DocxProcessor:
         image_bytes = image_stream.getvalue()
         return base64.b64encode(image_bytes).decode('utf-8')
 
-    def get_or_create_subject(self, name, lecturer_name):
+    def get_subject(self, name, lecturer_name):
         subject = self.db.query(Subject).filter(Subject.name == name).first()
         if not subject:
             raise ValueError(f"Subject {name} not found")
