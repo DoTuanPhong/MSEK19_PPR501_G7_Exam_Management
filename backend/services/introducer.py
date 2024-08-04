@@ -1,6 +1,8 @@
+# app/services/docx_processor.py
 import base64
-import os
-from docx import Document
+from io import BytesIO
+from spire.doc import *
+from spire.doc.common import *
 from app.models import Question, Choice, Subject, User
 from sqlalchemy.orm import Session
 
@@ -8,8 +10,10 @@ class DocxProcessor:
     def __init__(self, db: Session):
         self.db = db
 
-    def process_docx(self, file):
-        doc = Document(file)
+    def process_docx(self, file_path):
+        doc = Document()
+        doc.LoadFromFile(file_path)
+
         subject_name = None
         num_quiz = None
         lecturer = None
@@ -17,8 +21,9 @@ class DocxProcessor:
         questions = []
 
         # Process the first part
-        for paragraph in doc.paragraphs[:4]:
-            line = paragraph.text.strip()
+        for i in range(min(4, doc.Sections[0].Paragraphs.Count)):
+            paragraph = doc.Sections[0].Paragraphs[i]
+            line = paragraph.Text.strip()
             if line.startswith("Subject:"):
                 subject_name = line.split(":")[1].strip()
             elif line.startswith("Number of Quiz:"):
@@ -32,7 +37,7 @@ class DocxProcessor:
             raise ValueError("Missing required information in the document header")
 
         # Process the tables
-        for table in doc.tables:
+        for table in doc.Sections[0].Tables:
             question = self.process_question_table(table)
             if question:
                 questions.append(question)
@@ -52,28 +57,52 @@ class DocxProcessor:
         question_data = {}
         choices = []
 
-        for row in table.rows:
-            key = row.cells[0].text.strip().lower()
-            value = row.cells[1].text.strip()
+        for row in table.Rows:
+            if row.Cells.Count < 2:
+                continue
+
+            key = row.Cells[0].Paragraphs[0].Text.strip().lower()
+            value_cell = row.Cells[1]
 
             if key.startswith("qn="):
-                question_data["text"] = value
+                question_data["text"], question_data["image_data"] = self.extract_text_and_image(value_cell)
             elif key.startswith(("a.", "b.", "c.", "d.")):
-                choices.append(value)
+                choices.append(value_cell.Paragraphs[0].Text.strip())
             elif key == "answer:":
-                question_data["answer"] = value
+                question_data["answer"] = value_cell.Paragraphs[0].Text.strip()
             elif key == "mark:":
-                question_data["mark"] = float(value)
+                question_data["mark"] = float(value_cell.Paragraphs[0].Text.strip())
             elif key == "unit:":
-                question_data["unit"] = value
+                question_data["unit"] = value_cell.Paragraphs[0].Text.strip()
             elif key == "mix choices:":
-                question_data["mix_choices"] = value.lower() == "yes"
+                question_data["mix_choices"] = value_cell.Paragraphs[0].Text.strip().lower() == "yes"
 
         if all(k in question_data for k in ("text", "answer", "mark", "unit")) and choices:
             question_data["choices"] = choices
             return question_data
         return None
 
+    def extract_text_and_image(self, cell):
+        text_parts = []
+        image_data = None
+
+        for paragraph in cell.Paragraphs:
+            text_parts.append(paragraph.Text)
+            for item in paragraph.ChildObjects:
+                if isinstance(item, DocPicture):
+                    image_data = self.extract_image_data(item)
+                    if image_data:
+                        break
+            if image_data:
+                break
+
+        return " ".join(text_parts), image_data
+
+    def extract_image_data(self, doc_picture):
+        image_stream = BytesIO()
+        doc_picture.Image.Save(image_stream, ImageFormat.Png)
+        image_bytes = image_stream.getvalue()
+        return base64.b64encode(image_bytes).decode('utf-8')
 
     def get_or_create_subject(self, name, lecturer_name):
         subject = self.db.query(Subject).filter(Subject.name == name).first()
@@ -91,6 +120,7 @@ class DocxProcessor:
             question = Question(
                 subject_id=subject.id,
                 text=q_data["text"],
+                image_data=q_data.get("image_data"),
                 answer=q_data["answer"],
                 mark=q_data["mark"],
                 unit=q_data["unit"],
