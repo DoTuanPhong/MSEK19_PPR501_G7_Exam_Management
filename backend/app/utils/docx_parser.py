@@ -7,29 +7,36 @@ from docx.oxml.shared import qn
 
 def parse_docx(file_path):
     doc = docx.Document(file_path)
-    metadata = {}
+    info = {}
     questions = []
     warnings = []
 
-    # Process metadata
-    for i, paragraph in enumerate(doc.paragraphs[:4]):
-        try:
-            key, value = paragraph.text.split(': ', 1)
-            if i == 0:
-                metadata['subject'] = value.strip()
-            elif i == 1:
-                metadata['number_of_quiz'] = int(value.strip())
-            elif i == 2:
-                metadata['lecturer'] = value.strip()
-            elif i == 3:
-                metadata['date'] = datetime.strptime(value.strip(), '%d-%m-%Y').date()
-        except ValueError:
-            warnings.append(f"Invalid metadata format in paragraph {i+1}")
+    # Process info
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        if text.startswith("Subject:"):
+            try:
+                info['subject'] = text.split(":", 1)[1].strip()
+            except IndexError:
+                warnings.append("Subject format is incorrect.")
+        elif text.startswith("Number of Quiz:"):
+            try:
+                info['num_quiz'] = int(text.split(":", 1)[1].strip())
+            except (ValueError, IndexError):
+                warnings.append("Number of Quiz format is incorrect.")
+        elif text.startswith("Lecturer:"):
+            info['lecturer'] = text.split(":", 1)[1].strip()
+        elif text.startswith("Date:"):
+            try:
+                date_str = text.split(":", 1)[1].strip()
+                info['date'] = datetime.strptime(date_str, "%d-%m-%Y").date()
+            except (ValueError, IndexError):
+                warnings.append("Date format is incorrect.")
+    if len(info) != 4:
+        warnings.append("Missing header information.")
 
-    if 'subject' not in metadata:
-        warnings.append("Subject is missing in the metadata")
-
-    for table_index, table in enumerate(doc.tables):
+    table_index = 0
+    for table in doc.tables:
         question = {}
         for row in table.rows:
             if len(row.cells) != 2:
@@ -39,7 +46,7 @@ def parse_docx(file_path):
             key = row.cells[0].text.strip().lower()
             value = row.cells[1].text.strip()
 
-            if key == 'qn':
+            if key.strip().lower().startswith('qn'):
                 question['text'] = value
                 # Handle image (MS Word 2016+)
                 for paragraph in row.cells[1].paragraphs:
@@ -54,23 +61,23 @@ def parse_docx(file_path):
                                 buffered = BytesIO()
                                 image.save(buffered, format="PNG")
                                 question['image'] = base64.b64encode(buffered.getvalue()).decode()
-            elif key.startswith('a.'):
+            elif key.strip().lower() == 'a.':
                 question['choices'] = [value]
-            elif key in ['b.', 'c.', 'd.']:
+            elif key.strip().lower() in ['b.', 'c.', 'd.']:
                 if 'choices' in question:
                     question['choices'].append(value)
                 else:
                     warnings.append(f"Choice {key} found before 'a.' in table {table_index + 1}")
-            elif key == 'answer':
+            elif key.strip().lower() == 'answer':
                 question['correct_answer'] = value
-            elif key == 'mark':
+            elif key.strip().lower() == 'mark':
                 try:
                     question['mark'] = float(value)
                 except ValueError:
                     warnings.append(f"Invalid mark value in table {table_index + 1}")
-            elif key == 'unit':
+            elif key.strip().lower() == 'unit':
                 question['unit'] = value
-            elif key == 'mix choices':
+            elif key.strip().lower() == 'mix choices':
                 question['mix_choices'] = value.lower() == 'yes'
 
         if 'text' not in question:
@@ -82,5 +89,7 @@ def parse_docx(file_path):
 
         if 'text' in question and 'choices' in question and 'correct_answer' in question:
             questions.append(question)
+        
+        table_index = table_index + 1
 
-    return metadata, questions, warnings
+    return info, questions, warnings

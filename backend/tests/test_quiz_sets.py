@@ -19,7 +19,7 @@ def test_parse_docx_with_sample_file():
     assert metadata['subject'] == 'ISC'
     assert metadata['number_of_quiz'] == 30
     assert metadata['lecturer'] == 'hungpd2'
-    assert metadata['date'] == datetime.strptime('01-01-2022', '%d-%m-%Y').date()  # Adjust date as per your template
+    assert metadata['date'] == datetime.strptime('22-08-1999', '%d-%m-%Y').date()  # Adjust date as per your template
     
     # Check questions
     assert len(questions) > 0  # Ensure there's at least one question
