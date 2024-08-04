@@ -11,7 +11,7 @@ def parse_docx(file_path):
     questions = []
     warnings = []
 
-    # Process info
+    # Process metadata
     for para in doc.paragraphs:
         text = para.text.strip()
         if text.startswith("Subject:"):
@@ -35,9 +35,13 @@ def parse_docx(file_path):
     if len(info) != 4:
         warnings.append("Missing header information.")
 
+    expected_order = ['qn', 'a.', 'b.', 'c.', 'd.', 'answer', 'mark', 'unit', 'mix choices']
     table_index = 0
+
     for table in doc.tables:
         question = {}
+        order = []
+
         for row in table.rows:
             if len(row.cells) != 2:
                 warnings.append(f"Invalid table format in table {table_index + 1}")
@@ -45,6 +49,7 @@ def parse_docx(file_path):
 
             key = row.cells[0].text.strip().lower()
             value = row.cells[1].text.strip()
+            order.append(key)
 
             if key.strip().lower().startswith('qn'):
                 question['text'] = value
@@ -80,6 +85,12 @@ def parse_docx(file_path):
             elif key.strip().lower() == 'mix choices':
                 question['mix_choices'] = value.lower() == 'yes'
 
+        # Ensure keys are in the expected order
+        order = list(map(lambda x: x.strip().lower(), order))
+        order[0] = order[0][:2]
+        if order != expected_order:
+            warnings.append(f"Keys are not in the expected order in table {table_index + 1}")
+
         if 'text' not in question:
             warnings.append(f"Question text is missing in table {table_index + 1}")
         if 'choices' not in question or len(question.get('choices', [])) < 2:
@@ -90,6 +101,7 @@ def parse_docx(file_path):
         if 'text' in question and 'choices' in question and 'correct_answer' in question:
             questions.append(question)
         
-        table_index = table_index + 1
+        table_index += 1
 
     return info, questions, warnings
+
