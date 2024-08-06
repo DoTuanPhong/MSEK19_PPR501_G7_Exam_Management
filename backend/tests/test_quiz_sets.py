@@ -5,7 +5,7 @@ from datetime import datetime
 from app.utils.docx_parser import parse_docx
 
 def test_parse_docx_with_sample_file():
-    file_path = r"F:\FSB\Python for Engineer\Week 2 - 1\Template.docx"
+    file_path = r"F:\FSB\Python for Engineer\Week 2 - 1\Template 2.docx"
     
     # Call the parse_docx function with the sample file
     info, questions, warnings = parse_docx(file_path)
@@ -22,19 +22,21 @@ def test_parse_docx_with_sample_file():
     assert info['date'] == datetime.strptime('22-08-1999', '%d-%m-%Y').date()  # Adjust date as per your template
     
     # Check questions
-    assert len(questions) > 0  # Ensure there's at least one question
-    
+    assert len(questions) == 26  # Ensure there's at least one question
+  
+  
     # Validate the first question (adjust the expected values based on the actual content of your template)
-    question = questions[0]
+    question = questions[2]
+    print("Image: ", question['image'][:50])
+    assert info['num_quiz'] == 3
     assert 'text' in question
     assert 'choices' in question
     assert 'correct_answer' in question
     assert 'mark' in question
     assert 'unit' in question
     assert 'mix_choices' in question
-    assert 'image'  in question
+    assert 'image' in question
 
-    print("Image: ", question['image'][0:5])
     
     # Check warnings
     assert len(warnings) == 0  # Ensure there are no warnings for a correctly formatted document

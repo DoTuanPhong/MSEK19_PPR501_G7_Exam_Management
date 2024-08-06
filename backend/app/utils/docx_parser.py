@@ -65,7 +65,7 @@ def parse_docx(file_path):
                         if image_parts:
                             image_bytes = image_parts[0].blob
                             question['image'] = base64.b64encode(image_bytes).decode('utf-8')
-                            print('question image: ', question['image'])
+                            # print('question image: ', question['image'][:50])
                 question['choices'] = [value]
             elif key.strip().lower() in ['b.', 'c.', 'd.']:
                 if 'choices' in question:
@@ -89,7 +89,7 @@ def parse_docx(file_path):
         order[0] = order[0][:2]
         
         if order != expected_order:
-            warnings.append(f"Keys are not in the expected order in table {table_index + 1}, {order}")
+            warnings.append(f"Row names are not in the expected order in table {table_index + 1}, {order}")
 
         if 'text' not in question:
             warnings.append(f"Question text is missing in table {table_index + 1}")
@@ -101,7 +101,16 @@ def parse_docx(file_path):
         if 'text' in question and 'choices' in question and 'correct_answer' in question:
             questions.append(question)
         
-        table_index += 1
+    table_index += 1
+    # for question in enumerate(questions,1):
+    #     print(question[0], '-----------------------------------------------')
+    #     for k,v in question[1].items():
+    #         if k == 'image':
+    #             print(k, v[:50])
+    #         else:
+    #             print(k,v)
+
+    return info, questions, warnings
 
     return info, questions, warnings
 
