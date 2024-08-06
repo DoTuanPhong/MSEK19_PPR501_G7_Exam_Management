@@ -1,7 +1,12 @@
+import uuid
 import docx
 import base64
-from datetime import datetime
+from datetime import date, datetime
 from docx.oxml.shape import CT_Picture
+from sqlalchemy.orm import Session
+import re
+from backend.crud import create_question
+from backend.schemas import IntroducerResponse, QuestionCreate
 
 
 def parse_docx(file_path):
@@ -49,8 +54,20 @@ def parse_docx(file_path):
             key = row.cells[0].text.strip().lower()
             value = row.cells[1].text.strip()
             order.append(key)
+            
+            if value is None:
+                warnings.append(f"Emty cell value was found in table {table_index + 1}")
+                continue
+            
+            
 
             if key.strip().lower().startswith('qn'):
+                qn = re.findall("^qn=(\d+)", key.strip())
+                if qn[0] is None:
+                    warnings.append(f"Question number not found in table {table_index + 1}")
+                    continue
+                question['question_number'] = qn[0]
+
                 question['text'] = value
                 # Handle image
                 for paragraph in row.cells[1].paragraphs:
@@ -65,7 +82,7 @@ def parse_docx(file_path):
                         if image_parts:
                             image_bytes = image_parts[0].blob
                             question['image'] = base64.b64encode(image_bytes).decode('utf-8')
-                            # print('question image: ', question['image'][:50])
+                            # print('question image: ', question['image'])
                 question['choices'] = [value]
             elif key.strip().lower() in ['b.', 'c.', 'd.']:
                 if 'choices' in question:
@@ -89,7 +106,7 @@ def parse_docx(file_path):
         order[0] = order[0][:2]
         
         if order != expected_order:
-            warnings.append(f"Row names are not in the expected order in table {table_index + 1}, {order}")
+            warnings.append(f"Row names are not following the expected order in table {table_index + 1}, {order}")
 
         if 'text' not in question:
             warnings.append(f"Question text is missing in table {table_index + 1}")
@@ -101,17 +118,50 @@ def parse_docx(file_path):
         if 'text' in question and 'choices' in question and 'correct_answer' in question:
             questions.append(question)
         
-    table_index += 1
-    # for question in enumerate(questions,1):
-    #     print(question[0], '-----------------------------------------------')
-    #     for k,v in question[1].items():
-    #         if k == 'image':
-    #             print(k, v[:50])
-    #         else:
-    #             print(k,v)
+        table_index += 1
 
     return info, questions, warnings
+    
+async def process_uploaded_file(user_id: uuid.UUID, file_path: str, db: Session) -> IntroducerResponse:
+    info, questions, warnings = parse_docx(file_path)
+    
+    # user = crud.get_user(db, user_id)
+    # if not user:
+    #     raise HTTPException(status_code=404, detail="User not found")
+    if warnings:
+        # If there are warnings, don't add questions to the database
+        return IntroducerResponse(
+            status="fail",
+            message="Warnings found during processing. Questions not added to database.",
+            exam_subject=info.get('subject', ''),
+            questions_created=0,
+            warnings=warnings
+        )
 
-    return info, questions, warnings
-
-
+    questions_created = []
+    for q in questions:
+        db_question = create_question(db, QuestionCreate(
+            question_number=f"{len(questions_created) + 1}",
+            exam_subject=info['subject'],
+            # exam_maker=user_id,
+            question_date=date.today(),
+            question_content=q['text'],
+            question_image=q.get('image'),
+            option_a=q['choices'][0],
+            option_b=q['choices'][1],
+            option_c=q['choices'][2],
+            option_d=q['choices'][3],
+            correct_answer=q['correct_answer'],
+            question_mark=int(q['mark']),
+            question_unit=q.get('unit', ''),
+            question_mixchoices=q.get('mix_choices', False)
+        ))
+        questions_created.append(db_question)
+    
+    return IntroducerResponse(
+        status="success",
+        message="File processed successfully. Questions added to database.",
+        exam_subject=info['subject'],
+        questions_created=len(questions_created),
+        warnings=[]
+        )
