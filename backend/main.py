@@ -191,7 +191,5 @@ def create_exam(
 ):
     # if current_user.role != "exam_creator":
     #     raise HTTPException(status_code=403, detail="Not authorized to create exams")
-    
-    # new_exam = create_exam(exam_data, current_user.user_id)
     new_exam = create_exam(exam_data)
     return new_exam
