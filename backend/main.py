@@ -1,9 +1,11 @@
 # Import các thư viện cần thiết từ FastAPI, SQLAlchemy và các module khác
+import os
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
+from backend.services import process_uploaded_file
 from database import SessionLocal, engine, Base
 from models import User, Question, Exam, Schedule
-from schemas import UserCreate, UserOut, UserUpdate, QuestionCreate, QuestionOut, QuestionUpdate, ExamCreate, ExamOut, ExamUpdate, ScheduleCreate, ScheduleOut, ScheduleUpdate 
+from schemas import ImporterResponse, UserCreate, UserOut, UserUpdate, QuestionCreate, QuestionOut, QuestionUpdate, ExamCreate, ExamOut, ExamUpdate, ScheduleCreate, ScheduleOut, ScheduleUpdate 
 import uuid
 import crud
 
@@ -160,3 +162,36 @@ def delete_schedule(schedule_id: uuid.UUID, db: Session = Depends(get_db)):
     if db_schedule is None:
         raise HTTPException(status_code=404, detail="Schedule not found")
     return crud.delete_schedule(db=db, schedule_id=schedule_id)
+
+@app.post("/upload-and-process/", response_model=ImporterResponse)
+def upload_and_process(
+    user_id: uuid.UUID,
+    file_path: str,
+    db: Session = Depends(get_db)
+):
+        # Check if file exists
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=400, detail="File not found")
+        user = crud.get_user(db, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        if user.role not in ['admin', 'exam inputter']:
+            raise HTTPException(status_code=403, detail="Permission denied!")
+        
+        response = process_uploaded_file(user_id, file_path, db)
+        
+        os.unlink(file_path)
+        return response
+
+@app.post("/exams/", response_model=ExamOut)
+def create_exam(
+    exam_data: ExamCreate,
+    db: Session = Depends(get_db)
+    # ,current_user: User = Depends(get_current_user)
+):
+    # if current_user.role != "exam_creator":
+    #     raise HTTPException(status_code=403, detail="Not authorized to create exams")
+    
+    # new_exam = create_exam(exam_data, current_user.user_id)
+    new_exam = create_exam(exam_data)
+    return new_exam

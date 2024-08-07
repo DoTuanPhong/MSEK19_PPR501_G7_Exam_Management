@@ -4,7 +4,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 # URL kết nối đến cơ sở dữ liệu PostgreSQL
-SQLALCHEMY_DATABASE_URL = "postgresql+psycopg2://postgres:123456aA@localhost/MSE-DEV-1"
+SQLALCHEMY_DATABASE_URL = "postgresql://postgres:123456aA@localhost/MSE-DEV-1"
 
 # Tạo engine để quản lý kết nối đến DB
 engine = create_engine(SQLALCHEMY_DATABASE_URL)

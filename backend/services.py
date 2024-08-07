@@ -1,3 +1,4 @@
+import random
 import uuid
 import docx
 import base64
@@ -6,7 +7,9 @@ from docx.oxml.shape import CT_Picture
 from sqlalchemy.orm import Session
 import re
 from backend.crud import create_question
-from backend.schemas import IntroducerResponse, QuestionCreate
+from backend.models import Exam, ExamQuestion, Question, User
+from backend.schemas import ExamCreate, ImporterResponse, QuestionCreate
+from sqlalchemy.sql import func
 
 
 def parse_docx(file_path):
@@ -119,18 +122,16 @@ def parse_docx(file_path):
             questions.append(question)
         
         table_index += 1
-
     return info, questions, warnings
-    
-async def process_uploaded_file(user_id: uuid.UUID, file_path: str, db: Session) -> IntroducerResponse:
+
+def process_uploaded_file(user_id: uuid.UUID, file_path: str, db: Session):
     info, questions, warnings = parse_docx(file_path)
     
-    # user = crud.get_user(db, user_id)
-    # if not user:
-    #     raise HTTPException(status_code=404, detail="User not found")
+
+
     if warnings:
         # If there are warnings, don't add questions to the database
-        return IntroducerResponse(
+        return ImporterResponse(
             status="fail",
             message="Warnings found during processing. Questions not added to database.",
             exam_subject=info.get('subject', ''),
@@ -141,9 +142,9 @@ async def process_uploaded_file(user_id: uuid.UUID, file_path: str, db: Session)
     questions_created = []
     for q in questions:
         db_question = create_question(db, QuestionCreate(
-            question_number=f"{len(questions_created) + 1}",
+            question_number=q['question_number'],
             exam_subject=info['subject'],
-            # exam_maker=user_id,
+            exam_maker=user_id,
             question_date=date.today(),
             question_content=q['text'],
             question_image=q.get('image'),
@@ -158,10 +159,76 @@ async def process_uploaded_file(user_id: uuid.UUID, file_path: str, db: Session)
         ))
         questions_created.append(db_question)
     
-    return IntroducerResponse(
+    return ImporterResponse(
         status="success",
         message="File processed successfully. Questions added to database.",
         exam_subject=info['subject'],
         questions_created=len(questions_created),
         warnings=[]
         )
+        
+def create_exam(db:Session, exam_data: ExamCreate):
+    new_exam = Exam(
+    exam_id=str(uuid.uuid4()),
+    exam_subject=exam_data.exam_subject,
+    exam_code=exam_data.exam_code,
+    duration=exam_data.duration,
+    number_of_questions=exam_data.number_of_questions)
+    db.add(new_exam)
+    db.commit()
+        # Select questions for the exam
+    questions = select_questions(db, exam_data.exam_subject, exam_data.number_of_questions)
+
+    # Randomize answer order for each question
+    randomized_questions = randomize_answers(questions)
+
+    # Associate questions with the exam
+    associate_questions_with_exam(db, new_exam.exam_id, randomized_questions)
+
+    return new_exam
+
+def select_questions(db: Session, subject: str, num_questions: int):
+    questions = db.query(Question).filter_by(Question.exam_subject == subject).order_by(func.random()).limit(num_questions).all()
+    return questions
+
+def randomize_answers(questions):
+    randomized_questions = []
+    for question in questions:
+        options = [('a', question.option_a),
+                   ('b', question.option_b),
+                   ('c', question.option_c),
+                   ('d', question.option_d)]
+        random.shuffle(open)
+
+        new_question = question.copy()
+        new_question.option_a = options[0][1]
+        new_question.option_b = options[1][1]
+        new_question.option_c = options[2][1]
+        new_question.option_d = options[3][1]
+        
+
+        # Update the correct answer to match the new order
+        index = 0
+        for letter, option in options:
+            if letter == question.correct_answer.lower():
+                answers = ['a','b','c','d']   
+                new_question.correct_answer = answers[index]
+                break
+            index = index + 1
+        
+        randomized_questions.append(new_question)
+    
+def associate_questions_with_exam(db: Session, exam_id: str, questions):
+    for question in questions:
+        exam_question = ExamQuestion(
+            id=uuid.uuid4(),
+            exam_id=exam_id,
+            question_id=question.question_id,
+            option_a=question.option_a,
+            option_b=question.option_b,
+            option_c=question.option_c,
+            option_d=question.option_d,
+            correct_answer=question.correct_answer
+        )
+        db.add(exam_question)
+    db.commit()

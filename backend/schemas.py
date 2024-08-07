@@ -44,25 +44,11 @@ class QuestionBase(BaseModel):
 
 # Schema cho việc tạo Question mới, kế thừa từ QuestionBase
 class QuestionCreate(QuestionBase):
-    question_number: str
-    # exam_maker: UUID 
-    exam_subject: str 
-    question_date: date 
-    question_content: str 
-    question_image: Optional[str] = None 
-    option_a: str
-    option_b: str
-    option_c: str
-    option_d: str 
-    correct_answer: str 
-    question_mark: int  
-    question_unit: str 
-    question_mixchoices: Optional[bool] = False  
-
+    pass
 
 # Schema cho việc cập nhật Question, kế thừa từ QuestionBase
 class QuestionUpdate(QuestionBase):
-    pass
+    question_id: UUID  # ID câu hỏi
 
 # Schema cho phản hồi Question, kế thừa từ QuestionBase
 class QuestionOut(QuestionBase):
@@ -82,7 +68,7 @@ class ExamCreate(ExamBase):
 
 # Schema cho việc cập nhật Exam
 class ExamUpdate(ExamBase):
-    pass
+    exam_id: UUID
 
 # Schema để trả về thông tin Exam
 class ExamOut(ExamBase):
@@ -108,9 +94,11 @@ class ScheduleUpdate(ScheduleBase):
 class ScheduleOut(ScheduleBase):
     schedule_id: UUID
 
-class IntroducerResponse(BaseModel):
+class ImporterResponse(BaseModel):
     status: str 
     message: str
     exam_subject: str
     questions_created: int
     warnings: list[str]
+
+    

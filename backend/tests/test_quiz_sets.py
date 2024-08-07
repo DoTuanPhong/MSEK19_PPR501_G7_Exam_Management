@@ -2,7 +2,8 @@ import pytest
 import docx
 from io import BytesIO
 from datetime import datetime
-from app.utils.docx_parser import parse_docx
+
+from backend.services import parse_docx
 
 def test_parse_docx_with_sample_file():
     file_path = r"F:\FSB\Python for Engineer\Week 2 - 1\Template 2.docx"

@@ -54,6 +54,17 @@ class Exam(Base):
     duration = Column(Integer, nullable=False)
     number_of_questions = Column(Integer, nullable=False)
 
+class ExamQuestion(Base):
+    __tablename__ = "Exam_Question"
+
+    id = Column(pg_UUID(as_uuid=True), primary_key = True, default = uuid.uuid4)
+    exam_id = Column(pg_UUID(as_uuid=True), ForeignKey("Exam.exam_id"), nullable = False)
+    question_id = Column(pg_UUID(as_uuid=True), ForeignKey("Question.question_id"), nullable = False)
+    option_a = Column(Text, nullable = False)
+    option_b = Column(Text, nullable = False)
+    option_c = Column(Text, nullable = False)
+    option_d = Column(Text, nullable = False)
+    correct_answer = Column(String[1])
 
 # Định nghĩa bảng Schedule
 class Schedule(Base):
